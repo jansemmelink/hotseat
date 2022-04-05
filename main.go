@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
-	api "bitbucket.org/vservices/go-api"
 	"bitbucket.org/vservices/hotseat/db"
+	api "bitbucket.org/vservices/hotseat/go-api"
 	"github.com/go-msvc/errors"
 	"github.com/gorilla/mux"
 	"github.com/stewelarend/logger"
