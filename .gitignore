@@ -1,0 +1,3 @@
+hotseat
+test_client/test_client
+data/maria-db/aria_log.00000001 data/maria-db/aria_log_control data/maria-db/ddl_recovery-backup.log data/maria-db/ddl_recovery.log data/maria-db/hotseat data/maria-db/ib_buffer_pool data/maria-db/ib_logfile0 data/maria-db/ibdata1 data/maria-db/ibtmp1 data/maria-db/multi-master.info data/maria-db/mysql data/maria-db/mysql_upgrade_info data/maria-db/performance_schema data/maria-db/sys
