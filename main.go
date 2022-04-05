@@ -325,8 +325,8 @@ func getGroups(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.R
 func addGroup(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
 	session := ctx.Value(db.Session{}).(db.Session)
 	var newGroup struct {
-		Name         string `json:"string"`
-		AccountGroup bool   `json:"account_group"` //set to true to make group owned by your account (only if you are account admin user!)
+		Name         string `json:"name"`
+		AccountGroup bool   `json:"account_group"` //set this to true to make group owned by your account (only if you are account admin user!)
 		//todo: later also allow create of group with other types of owners... and delete when owner is deleted
 	}
 	if err := json.NewDecoder(httpReq.Body).Decode(&newGroup); err != nil {
@@ -334,11 +334,12 @@ func addGroup(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Re
 	}
 
 	groupSpec := db.Group{
-		Name: newGroup.Name,
+		Account: &session.User.Account,
+		Name:    newGroup.Name,
 	}
 	if newGroup.AccountGroup {
 		if !session.User.Admin {
-			return http.StatusUnauthorized, errors.Errorf("groups with account_group:true can only be created by account admin users")
+			return http.StatusUnauthorized, errors.Errorf("account group can only be created by account admin users")
 		}
 		groupSpec.OwnerType = "account"
 		groupSpec.OwnerID = session.User.Account.ID

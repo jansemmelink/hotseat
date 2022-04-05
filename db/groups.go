@@ -16,6 +16,18 @@ type Group struct {
 	Name      string   `json:"name"`
 }
 
+type GroupRow struct {
+	ID            string   `db:"id"`
+	AccountID     string   `db:"account_id"`
+	AccountName   string   `db:"account_name"`
+	AccountActive bool     `db:"account_active"`
+	AccountAdmin  bool     `db:"account_admin"`
+	Expiry        *SqlTime `db:"account_expiry"`
+	OwnerType     string   `db:"owner_type"` //e.g. user or account	(could also be a group of xxx)
+	OwnerID       string   `db:"owner_id"`   //e.g. user.id or account.id
+	Name          string   `db:"name"`
+}
+
 type GroupMember struct {
 	Group      *Group `json:"group,omitempty"`
 	MemberType string `json:"member_type"` //e.g. user or xxx
@@ -33,17 +45,7 @@ type GroupsFilter struct {
 
 func GetGroups(filter GroupsFilter, sort []string, limit int) ([]Group, error) {
 	log.Debugf("GetGroups(filter: %+v, sort: %+v, limit: %d)", filter, sort, limit)
-	var groupRows []struct {
-		ID            string   `db:"id"`
-		AccountID     string   `db:"account_id"`
-		AccountName   string   `db:"account_name"`
-		AccountActive bool     `db:"account_active"`
-		AccountAdmin  bool     `db:"account_admin"`
-		Expiry        *SqlTime `db:"account_expiry"`
-		OwnerType     string   `db:"owner_type"` //e.g. user or account	(could also be a group of xxx)
-		OwnerID       string   `db:"owner_id"`   //e.g. user.id or account.id
-		Name          string   `db:"name"`
-	}
+	var groupRows []GroupRow
 	if err := FilteredSelect(
 		&groupRows,
 		"SELECT g.id,a.id as account_id,a.name as account_name,a.active as account_active,a.admin as account_admin,a.expiry as account_expiry,g.name,g.owner_type,g.owner_id FROM groups as g INNER JOIN accounts as a on a.id=g.account_id",
@@ -75,24 +77,28 @@ func AddGroup(g Group) (*Group, error) {
 	if g.ID != "" {
 		return nil, errors.Errorf("id specified for add")
 	}
+	if g.Account == nil || g.Account.ID == "" {
+		return nil, errors.Errorf("missing account")
+	}
 	if g.Name == "" {
-		return nil, errors.Errorf("missing group_name")
+		return nil, errors.Errorf("missing name")
 	}
 
-	var row struct {
-		ID string `db:"id"`
-	}
+	//check that owner_type+owner_id refers to existing item in the db
+	var row ItemRow
 	if err := NamedGet(&row, "SELECT id FROM "+g.OwnerType+"s WHERE id=:id", map[string]interface{}{
 		"id": g.OwnerID,
 	}); err != nil {
-		return nil, errors.Errorf("cannot get admin %s:{\"id\":\"%s\"}", g.OwnerType, g.OwnerID)
+		return nil, errors.Errorf("group owner not found %s:{\"id\":\"%s\"}", g.OwnerType, g.OwnerID)
 	}
 
+	//create the group
 	g.ID = uuid.New().String()
 	if _, err := db.NamedExec(
-		"insert into groups set id=:id,admin_type=:admin_type,admin_id:admin_id,name=:name",
+		"insert into groups set id=:id,account_id=:account_id,owner_type=:owner_type,owner_id=:owner_id,name=:name",
 		map[string]interface{}{
 			"id":         g.ID,
+			"account_id": g.Account.ID,
 			"owner_type": g.OwnerType,
 			"owner_id":   g.OwnerID,
 			"name":       g.Name,
@@ -104,17 +110,19 @@ func AddGroup(g Group) (*Group, error) {
 } //AddGroup()
 
 func GetGroup(id string) (*Group, error) {
-	var g Group
+	gr := GroupRow{
+		ID: id,
+	}
 	if err := NamedGet(
-		&g,
-		"select * from groups where id=:id",
+		&gr,
+		"SELECT g.id,a.id as account_id,a.name as account_name,a.active as account_active,a.admin as account_admin,a.expiry as account_expiry,g.name,g.owner_type,g.owner_id FROM groups as g INNER JOIN accounts as a on a.id=g.account_id WHERE g.id=:id",
 		map[string]interface{}{
 			"id": id,
 		},
 	); err != nil {
 		return nil, errors.Wrapf(err, "failed to get group")
 	}
-	return &g, nil
+	return &Group{}, nil
 } //GetGroup()
 
 type GroupMembersFilter struct {
