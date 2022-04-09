@@ -1,0 +1,770 @@
+{
+	"info": {
+		"_postman_id": "b637ef8b-7361-4f8d-94e7-a90cd73d82ba",
+		"name": "Authentication",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Login as System Admin",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin\",\n    \"password\": \"admin\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:3000/login",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"login"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Login as admin user",
+					"originalRequest": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"admin\",\n    \"password\": \"admin\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:3000/login",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"login"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						},
+						{
+							"key": "Date",
+							"value": "Sat, 09 Apr 2022 06:45:28 GMT"
+						},
+						{
+							"key": "Content-Length",
+							"value": "260"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"token\": \"d3c80b14-6a0f-42f3-bd6e-c3248cbf39a4\",\n    \"user\": {\n        \"id\": \"7ec6f8ae-b4f9-11ec-a38f-0242ac170002\",\n        \"account\": {\n            \"id\": \"76b8f2ae-b4f9-11ec-a38f-0242ac170002\",\n            \"name\": \"admin\",\n            \"active\": true,\n            \"admin\": true,\n            \"expiry\": null\n        },\n        \"username\": \"admin\",\n        \"admin\": true,\n        \"active\": true\n    }\n}"
+				}
+			]
+		},
+		{
+			"name": "Get List of Users",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Auth-Token",
+						"value": "{{X-Auth-Token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "localhost:{{Port}}/users?account_id=fab22945-4e92-48ac-aada-e4239729dd19",
+					"host": [
+						"localhost"
+					],
+					"port": "{{Port}}",
+					"path": [
+						"users"
+					],
+					"query": [
+						{
+							"key": "account_id",
+							"value": "fab22945-4e92-48ac-aada-e4239729dd19",
+							"description": "Account ID to filter on"
+						}
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Get List of Users",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Auth-Token",
+								"value": "{{X-Auth-Token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "localhost:{{Port}}/users?account_id=fab22945-4e92-48ac-aada-e4239729dd19",
+							"host": [
+								"localhost"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"users"
+							],
+							"query": [
+								{
+									"key": "account_id",
+									"value": "fab22945-4e92-48ac-aada-e4239729dd19"
+								}
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						},
+						{
+							"key": "Date",
+							"value": "Sat, 09 Apr 2022 07:32:35 GMT"
+						},
+						{
+							"key": "Content-Length",
+							"value": "199"
+						}
+					],
+					"cookie": [],
+					"body": "[\n    {\n        \"id\": \"ba3e192b-5875-43fd-a328-f2eedc20ab88\",\n        \"account\": {\n            \"id\": \"fab22945-4e92-48ac-aada-e4239729dd19\",\n            \"name\": \"test2\",\n            \"active\": true,\n            \"expiry\": null\n        },\n        \"username\": \"test2.admin\",\n        \"admin\": true,\n        \"active\": true\n    }\n]"
+				}
+			]
+		},
+		{
+			"name": "Get User Details",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Auth-Token",
+						"value": "{{X-Auth-Token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "localhost:{{Port}}/user/ba3e192b-5875-43fd-a328-f2eedc20ab88",
+					"host": [
+						"localhost"
+					],
+					"port": "{{Port}}",
+					"path": [
+						"user",
+						"ba3e192b-5875-43fd-a328-f2eedc20ab88"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Get User Details",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Auth-Token",
+								"value": "{{X-Auth-Token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "localhost:{{Port}}/user/ba3e192b-5875-43fd-a328-f2eedc20ab88",
+							"host": [
+								"localhost"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"user",
+								"ba3e192b-5875-43fd-a328-f2eedc20ab88"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						},
+						{
+							"key": "Date",
+							"value": "Sat, 09 Apr 2022 07:34:36 GMT"
+						},
+						{
+							"key": "Content-Length",
+							"value": "197"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"id\": \"ba3e192b-5875-43fd-a328-f2eedc20ab88\",\n    \"account\": {\n        \"id\": \"fab22945-4e92-48ac-aada-e4239729dd19\",\n        \"name\": \"test2\",\n        \"active\": true,\n        \"expiry\": null\n    },\n    \"username\": \"test2.admin\",\n    \"admin\": true,\n    \"active\": true\n}"
+				}
+			]
+		},
+		{
+			"name": "Get List of Accounts",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Auth-Token",
+						"value": "{{X-Auth-Token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "localhost:{{Port}}/accounts",
+					"host": [
+						"localhost"
+					],
+					"port": "{{Port}}",
+					"path": [
+						"accounts"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Get List of Accounts",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Auth-Token",
+								"value": "{{X-Auth-Token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "localhost:{{Port}}/accounts",
+							"host": [
+								"localhost"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"accounts"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						},
+						{
+							"key": "Date",
+							"value": "Sat, 09 Apr 2022 07:54:23 GMT"
+						},
+						{
+							"key": "Content-Length",
+							"value": "281"
+						}
+					],
+					"cookie": [
+						{
+							"expires": "Invalid Date"
+						}
+					],
+					"body": "[\n    {\n        \"id\": \"76b8f2ae-b4f9-11ec-a38f-0242ac170002\",\n        \"name\": \"admin\",\n        \"active\": true,\n        \"admin\": true,\n        \"expiry\": null\n    },\n    {\n        \"id\": \"02ad8ded-b051-4fe5-a312-65328164378c\",\n        \"name\": \"test\",\n        \"active\": true,\n        \"expiry\": null\n    },\n    {\n        \"id\": \"fab22945-4e92-48ac-aada-e4239729dd19\",\n        \"name\": \"test2\",\n        \"active\": true,\n        \"expiry\": null\n    }\n]"
+				}
+			]
+		},
+		{
+			"name": "Get Account Details",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Auth-Token",
+						"value": "{{X-Auth-Token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "localhost:{{Port}}/account/76b8f2ae-b4f9-11ec-a38f-0242ac170002",
+					"host": [
+						"localhost"
+					],
+					"port": "{{Port}}",
+					"path": [
+						"account",
+						"76b8f2ae-b4f9-11ec-a38f-0242ac170002"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Get Account Details",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Auth-Token",
+								"value": "{{X-Auth-Token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "localhost:{{Port}}/account/76b8f2ae-b4f9-11ec-a38f-0242ac170002",
+							"host": [
+								"localhost"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"account",
+								"76b8f2ae-b4f9-11ec-a38f-0242ac170002"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						},
+						{
+							"key": "Date",
+							"value": "Sat, 09 Apr 2022 07:55:54 GMT"
+						},
+						{
+							"key": "Content-Length",
+							"value": "102"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"id\": \"76b8f2ae-b4f9-11ec-a38f-0242ac170002\",\n    \"name\": \"admin\",\n    \"active\": true,\n    \"admin\": true,\n    \"expiry\": null\n}"
+				}
+			]
+		},
+		{
+			"name": "Create New Account and Account Admin User",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "X-Auth-Token",
+						"value": "{{X-Auth-Token}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\"name\":\"TestAccount\"}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:{{Port}}/accounts",
+					"host": [
+						"localhost"
+					],
+					"port": "{{Port}}",
+					"path": [
+						"accounts"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Create New Account and Account Admin User",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Auth-Token",
+								"value": "{{X-Auth-Token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"name\":\"TestAccount\"}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:{{Port}}/accounts",
+							"host": [
+								"localhost"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"accounts"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						},
+						{
+							"key": "Date",
+							"value": "Sat, 09 Apr 2022 07:57:17 GMT"
+						},
+						{
+							"key": "Content-Length",
+							"value": "255"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"admin_user\": {\n        \"id\": \"0496d75f-559c-49a5-bf13-fde0ce513a27\",\n        \"account\": {\n            \"id\": \"d1fd1084-bd6c-413e-b981-d2c5377ea1df\",\n            \"name\": \"TestAccount\",\n            \"active\": true,\n            \"expiry\": null\n        },\n        \"username\": \"TestAccount.admin\",\n        \"admin\": true,\n        \"active\": true\n    },\n    \"admin_password\": \"2/@dn[D:u\\\\\"\n}"
+				}
+			]
+		},
+		{
+			"name": "Login as Account Admin",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"{{AccountAdminUsername}}\",\n    \"password\": \"{{NewPassword}}\"\n}"
+				},
+				"url": {
+					"raw": "localhost:{{Port}}/login",
+					"host": [
+						"localhost"
+					],
+					"port": "{{Port}}",
+					"path": [
+						"login"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Login as Account Admin",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"{{AccountAdminUsername}}\",\n    \"password\": \"{{NewPassword}}\"\n}"
+						},
+						"url": {
+							"raw": "localhost:{{Port}}/login",
+							"host": [
+								"localhost"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"login"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						},
+						{
+							"key": "Date",
+							"value": "Sat, 09 Apr 2022 08:01:35 GMT"
+						},
+						{
+							"key": "Content-Length",
+							"value": "265"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"token\": \"4d5e60a4-acef-40bb-9375-7e3519ef3e96\",\n    \"user\": {\n        \"id\": \"0496d75f-559c-49a5-bf13-fde0ce513a27\",\n        \"account\": {\n            \"id\": \"d1fd1084-bd6c-413e-b981-d2c5377ea1df\",\n            \"name\": \"TestAccount\",\n            \"active\": true,\n            \"expiry\": null\n        },\n        \"username\": \"TestAccount.admin\",\n        \"admin\": true,\n        \"active\": true\n    }\n}"
+				}
+			]
+		},
+		{
+			"name": "Create Account User",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "X-Auth-Token",
+						"value": "{{AccountAdminToken}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\"username\":\"{{AccountName}}.user1\",\"password\":\"{{AccountName}}.user1\"}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:{{Port}}/users",
+					"host": [
+						"localhost"
+					],
+					"port": "{{Port}}",
+					"path": [
+						"users"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Create Account User",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Auth-Token",
+								"value": "{{AccountAdminToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"username\":\"{{AccountName}}.user1\",\"password\":\"{{AccountName}}.user1\"}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "localhost:{{Port}}/users",
+							"host": [
+								"localhost"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"users"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						},
+						{
+							"key": "Date",
+							"value": "Sat, 09 Apr 2022 08:06:18 GMT"
+						},
+						{
+							"key": "Content-Length",
+							"value": "200"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"id\": \"83b17ed8-5426-42d5-9d0e-0095de1f6179\",\n    \"account\": {\n        \"id\": \"d1fd1084-bd6c-413e-b981-d2c5377ea1df\",\n        \"name\": \"TestAccount\",\n        \"active\": true,\n        \"expiry\": null\n    },\n    \"username\": \"{{AccountName}}.user1\",\n    \"active\": true\n}"
+				}
+			]
+		},
+		{
+			"name": "Login as Account User",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"TestAccount.user1\",\n    \"password\": \"TestAccount.user1\"\n}"
+				},
+				"url": {
+					"raw": "localhost:{{Port}}/login",
+					"host": [
+						"localhost"
+					],
+					"port": "{{Port}}",
+					"path": [
+						"login"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Login as Account User",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"TestAccount.user1\",\n    \"password\": \"TestAccount.user1\"\n}"
+						},
+						"url": {
+							"raw": "localhost:{{Port}}/login",
+							"host": [
+								"localhost"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"login"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						},
+						{
+							"key": "Date",
+							"value": "Sat, 09 Apr 2022 08:22:32 GMT"
+						},
+						{
+							"key": "Content-Length",
+							"value": "252"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"token\": \"a60e3b28-7462-4a4b-951b-1d88d8bedcf5\",\n    \"user\": {\n        \"id\": \"6644eece-5e0c-45f0-be08-0293d16818b4\",\n        \"account\": {\n            \"id\": \"17b01de5-03d3-434a-a2f4-6dc117472bea\",\n            \"name\": \"TestAccount\",\n            \"active\": true,\n            \"expiry\": null\n        },\n        \"username\": \"TestAccount.user1\",\n        \"active\": true\n    }\n}"
+				}
+			]
+		},
+		{
+			"name": "Account User Get Own User Details",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-Auth-Token",
+						"value": "{{AccountUserToken}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "localhost:{{Port}}/user/{{AccountUserID}}",
+					"host": [
+						"localhost"
+					],
+					"port": "{{Port}}",
+					"path": [
+						"user",
+						"{{AccountUserID}}"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Account User Get Own User Details",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Auth-Token",
+								"value": "{{AccountUserToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "localhost:{{Port}}/user/{{AccountUserID}}",
+							"host": [
+								"localhost"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"user",
+								"{{AccountUserID}}"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						},
+						{
+							"key": "Date",
+							"value": "Sat, 09 Apr 2022 08:24:12 GMT"
+						},
+						{
+							"key": "Content-Length",
+							"value": "196"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"id\": \"6644eece-5e0c-45f0-be08-0293d16818b4\",\n    \"account\": {\n        \"id\": \"17b01de5-03d3-434a-a2f4-6dc117472bea\",\n        \"name\": \"TestAccount\",\n        \"active\": true,\n        \"expiry\": null\n    },\n    \"username\": \"TestAccount.user1\",\n    \"active\": true\n}"
+				}
+			]
+		}
+	]
+}

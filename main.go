@@ -29,7 +29,7 @@ func main() {
 				"GET":  auth(getUsers),
 				"POST": auth(addUser), //add account user - must be done by account admin
 			},
-			"/user/{id}": {
+			"/user/{user_id}": {
 				"GET":    auth(getUser),
 				"PUT":    auth(updUser),
 				"DELETE": auth(delUser),
@@ -99,9 +99,11 @@ func auth(f api.ContextHandler) api.Handler {
 		}
 
 		//no response or non-error response
-		httpRes.WriteHeader(status)
 		if res != nil {
 			httpRes.Header().Set("Content-Type", "application/json")
+		}
+		httpRes.WriteHeader(status)
+		if res != nil {
 			json.NewEncoder(httpRes).Encode(res)
 		}
 	}
@@ -133,10 +135,17 @@ func logout(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Requ
 
 func getUsers(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
 	session := ctx.Value(db.Session{}).(db.Session)
+	filter := map[string]interface{}{}
+	if session.User.Account.Admin {
+		//only filter on account_id if specified in params
+		if param_account_id := httpReq.URL.Query().Get("account_id"); param_account_id != "" {
+			filter["account_id"] = param_account_id
+		}
+	} else {
+		filter["account_id"] = session.User.Account.ID
+	}
 	users, err := db.GetUsers(
-		map[string]interface{}{
-			"account_id": session.User.Account.ID,
-		},
+		filter,
 		[]string{"username"},
 		10)
 	if err != nil {
@@ -177,8 +186,17 @@ func addUser(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Req
 }
 
 func getUser(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
-	//session := ctx.Value(db.Session{}).(db.Session)
-	return http.StatusInternalServerError, errors.Errorf("NYI")
+	session := ctx.Value(db.Session{}).(db.Session)
+	var accountID string
+	if !session.User.Account.Admin {
+		accountID = session.User.Account.ID
+	}
+	vars := mux.Vars(httpReq)
+	users, err := db.GetUser(accountID, vars["user_id"])
+	if err != nil {
+		return http.StatusNotFound, errors.Wrapf(err, "failed to get user")
+	}
+	return http.StatusOK, &users
 }
 
 func updUser(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
@@ -449,6 +467,7 @@ func addGroupMember(ctx context.Context, httpRes http.ResponseWriter, httpReq *h
 	if err != nil {
 		return http.StatusNotFound, errors.Errorf("group(%s) not found", mux.Vars(httpReq)["group_id"])
 	}
+	log.Debugf("group: %+v", group)
 
 	//can only manage your own group members
 	switch group.OwnerType {
@@ -464,13 +483,13 @@ func addGroupMember(ctx context.Context, httpRes http.ResponseWriter, httpReq *h
 			return http.StatusUnauthorized, errors.Errorf("group(%s) belongs to your account - only account admin can manage the members", group.ID)
 		}
 	default:
-		return http.StatusUnauthorized, errors.Errorf("group(%s) belongs to a %s - you cannot manage the members", group.ID, group.OwnerType)
+		return http.StatusUnauthorized, errors.Errorf("group(%s) belongs to a \"%s\" - you cannot manage the members", group.ID, group.OwnerType)
 	}
 
 	//see what is being added
 	var newMember struct {
-		Type string `json:"type"`
-		ID   string `json:"id"`
+		Type string `json:"member_type"`
+		ID   string `json:"member_id"`
 	}
 	if err := json.NewDecoder(httpReq.Body).Decode(&newMember); err != nil {
 		return http.StatusBadRequest, errors.Wrapf(err, "cannot decode JSON body")

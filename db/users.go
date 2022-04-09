@@ -18,7 +18,45 @@ type User struct {
 	Expiry   *time.Time `json:"expiry,omitempty"`
 }
 
+type userRow struct {
+	UserID        string   `db:"user_id"`
+	Username      string   `db:"username"`
+	PassHash      string   `db:"passhash"`
+	UserActive    bool     `db:"user_active"`
+	UserAdmin     bool     `db:"user_admin"`
+	UserExpiry    *SqlTime `db:"user_expiry"`
+	AccountID     string   `db:"account_id"`
+	AccountName   string   `db:"account_name"`
+	AccountActive bool     `db:"account_active"`
+	AccountAdmin  bool     `db:"account_admin"`
+	AccountExpiry *SqlTime `db:"account_expiry"`
+}
+
+func (ur userRow) User() User {
+	return User{
+		ID:       ur.UserID,
+		Username: ur.Username,
+		Account: Account{
+			ID:     ur.AccountID,
+			Name:   ur.AccountName,
+			Active: ur.AccountActive,
+			Admin:  ur.AccountAdmin,
+			Expiry: (*time.Time)(ur.AccountExpiry),
+		},
+		Admin:  ur.UserAdmin,
+		Active: ur.UserActive,
+		Expiry: (*time.Time)(ur.UserExpiry),
+	}
+}
+
+const userRowQuery = "select u.id as user_id,u.username,u.passhash,u.active as user_active,u.admin as user_admin,u.expiry as user_expiry," +
+	"a.id as account_id,a.name as account_name,a.active as account_active,a.admin as account_admin," +
+	"a.expiry as account_expiry" +
+	" from users as u" +
+	" LEFT JOIN accounts as a on a.id = u.account_id"
+
 func GetUsers(filter map[string]interface{}, sort []string, limit int) ([]User, error) {
+	log.Debugf("GetUsers(filter:%+v, sort:%+v, limit:%v)", filter, sort, limit)
 	filterQuery := []string{}
 	filterArgs := map[string]interface{}{}
 	for n, v := range filter {
@@ -40,7 +78,7 @@ func GetUsers(filter map[string]interface{}, sort []string, limit int) ([]User, 
 		}
 	}
 
-	query := "select id,account_id,username,admin,active,expiry from users"
+	query := userRowQuery
 	for i, f := range filterQuery {
 		if i == 0 {
 			query += " where " + f
@@ -49,12 +87,46 @@ func GetUsers(filter map[string]interface{}, sort []string, limit int) ([]User, 
 		}
 	}
 
-	var users []User
-	if err := NamedSelect(&users, query, filterArgs); err != nil {
+	var userRows []userRow
+	if err := NamedSelect(&userRows, query, filterArgs); err != nil {
 		return nil, errors.Wrapf(err, "failed to select users")
 	}
+
+	users := make([]User, len(userRows))
+	for i, ur := range userRows {
+		users[i] = ur.User()
+	}
 	return users, nil
-}
+} //GetUsers()
+
+//accountID may only be "" when called from system admin user, else the account id of the user calling this function
+func GetUser(accountID string, userID string) (*User, error) {
+	log.Debugf("GetUser(accountID:%s,userID:%s)", accountID, userID)
+	filterQuery := []string{}
+	filterArgs := map[string]interface{}{}
+	if accountID != "" {
+		filterQuery = append(filterQuery, "account_id=:account_id")
+		filterArgs["account_id"] = accountID
+	}
+	filterQuery = append(filterQuery, "u.id=:user_id")
+	filterArgs["user_id"] = userID
+
+	query := userRowQuery
+	for i, f := range filterQuery {
+		if i == 0 {
+			query += " where " + f
+		} else {
+			query += " and " + f
+		}
+	}
+
+	var userRow userRow
+	if err := NamedGet(&userRow, query, filterArgs); err != nil {
+		return nil, errors.Wrapf(err, "failed to get user")
+	}
+	u := userRow.User()
+	return &u, nil
+} //GetUser()
 
 type NewUser struct {
 	Account  Account    `json:"-"` //from session
@@ -126,25 +198,10 @@ func Login(req LoginRequest) (*Session, error) {
 		return nil, errors.Errorf("missing password")
 	}
 
-	var info struct {
-		UserID        string   `db:"user_id"`
-		PassHash      string   `db:"passhash"`
-		UserActive    bool     `db:"user_active"`
-		UserAdmin     bool     `db:"user_admin"`
-		UserExpiry    *SqlTime `db:"user_expiry"`
-		AccountID     string   `db:"account_id"`
-		AccountName   string   `db:"account_name"`
-		AccountActive bool     `db:"account_active"`
-		AccountAdmin  bool     `db:"account_admin"`
-		AccountExpiry *SqlTime `db:"account_expiry"`
-	}
+	var info userRow
 	if err := NamedGet(
 		&info,
-		"select u.id as user_id,u.passhash,u.active as user_active,u.admin as user_admin,u.expiry as user_expiry,"+
-			"a.id as account_id,a.name as account_name,a.active as account_active,a.admin as account_admin,"+
-			"a.expiry as account_expiry"+
-			" from users as u"+
-			" LEFT JOIN accounts as a on a.id = u.account_id"+
+		userRowQuery+
 			" WHERE u.username=:username",
 		map[string]interface{}{
 			"username": req.Username,
@@ -188,20 +245,7 @@ func Login(req LoginRequest) (*Session, error) {
 	}
 	return &Session{
 		Token: token,
-		User: User{
-			ID:       info.UserID,
-			Username: req.Username,
-			Account: Account{
-				ID:     info.AccountID,
-				Name:   info.AccountName,
-				Active: info.AccountActive,
-				Admin:  info.AccountAdmin,
-				Expiry: (*time.Time)(info.AccountExpiry),
-			},
-			Admin:  info.UserAdmin,
-			Active: info.UserActive,
-			Expiry: (*time.Time)(info.UserExpiry),
-		},
+		User:  info.User(),
 	}, nil
 }
 
@@ -247,7 +291,7 @@ func GetSession(token string) (*Session, error) {
 			"token": token,
 		},
 	); err != nil {
-		return nil, errors.Wrapf(err, "failed to prepare")
+		return nil, errors.Wrapf(err, "failed to get users")
 	}
 	log.Debugf("Read: %+v", info)
 

@@ -22,7 +22,7 @@ type GroupRow struct {
 	AccountName   string   `db:"account_name"`
 	AccountActive bool     `db:"account_active"`
 	AccountAdmin  bool     `db:"account_admin"`
-	Expiry        *SqlTime `db:"account_expiry"`
+	AccountExpiry        *SqlTime `db:"account_expiry"`
 	OwnerType     string   `db:"owner_type"` //e.g. user or account	(could also be a group of xxx)
 	OwnerID       string   `db:"owner_id"`   //e.g. user.id or account.id
 	Name          string   `db:"name"`
@@ -63,7 +63,7 @@ func GetGroups(filter GroupsFilter, sort []string, limit int) ([]Group, error) {
 				Name:   gr.AccountName,
 				Admin:  gr.AccountAdmin,
 				Active: gr.AccountActive,
-				Expiry: (*time.Time)(gr.Expiry),
+				Expiry: (*time.Time)(gr.AccountExpiry),
 			},
 			OwnerType: gr.OwnerType,
 			OwnerID:   gr.OwnerID,
@@ -122,7 +122,20 @@ func GetGroup(id string) (*Group, error) {
 	); err != nil {
 		return nil, errors.Wrapf(err, "failed to get group")
 	}
-	return &Group{}, nil
+	log.Debugf("GROUP ROW: %+v", gr)
+	return &Group{
+		ID: gr.ID,
+		Name: gr.Name,
+		OwnerType: gr.OwnerType,
+		OwnerID: gr.OwnerID,
+		Account: &Account{
+			ID: gr.AccountID,
+			Name: gr.AccountName,
+			Active: gr.AccountActive,
+			Admin: gr.AccountAdmin,
+			Expiry: (*time.Time)(gr.AccountExpiry),
+		},
+	}, nil
 } //GetGroup()
 
 type GroupMembersFilter struct {
@@ -148,8 +161,14 @@ func AddGroupMember(groupID string, memberType string, memberID string) (*GroupM
 		return nil, errors.Errorf("group(%s) not found", groupID)
 	}
 	var row AccountItemRow
-	if err := NamedGet(&row, "SELECT id,account_id FROM "+memberType+"s WHERE id=:id", map[string]interface{}{"id": memberID}); err != nil {
-		return nil, errors.Errorf("cannot get member %s:{\"id\":\"%s\"}", memberType, memberID)
+	if err := NamedGet(
+		&row,
+		"SELECT id,account_id FROM "+memberType+"s WHERE id=:id",
+		map[string]interface{}{
+			"id": memberID,
+		},
+	); err != nil {
+		return nil, errors.Errorf("cannot get member \"%s\":{\"id\":\"%s\"}", memberType, memberID)
 	}
 	if row.AccountID != g.Account.ID {
 		return nil, errors.Errorf("cannot add %s from other account", memberType)
