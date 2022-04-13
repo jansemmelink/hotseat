@@ -177,15 +177,42 @@ Add members to the group with:
 - system admin account
 - system admin user with password "admin"
 
-
 # DONE
 * login/out works
 * accounts can add
 * users can be added by account admin
 * can create and GET groups
+* added list of persons and retrieve list with GET /persons
+* POST /register for public users with profile
+* POST /activate for public users
 
 # NEXT
-* Add/remove members to/from group
+* new account + admin -> active admin user, which should be inactive then activate with token as normal user does, and username should be an email, but no user profile for account admin user (e.g. admin@voortrekkers.co.za)
+
+* membership idea:
+  make groups (like accounts) that are flat, but group can belong to another group i.e. optional parent
+  then:
+    create new group (own admin, own wallet) then apply to become member, or
+    create child group that is a member (same admin, optional own wallet)
+
+
+* register user with person profile (optional because system users has no person profile)
+    as part of public and specify password
+    then activate with URL (in email) made from register response
+    then let user join groups
+    and make groups restrict membership e.g. with motivation and review, or with national id list check etc
+    and allow existing public users to become group admins or account admins
+* add wallet to user
+    deposit into wallet
+    let user pay for membership
+* add wallet to account and sub-groups with own wallets and own admins
+    may be each kommando is own account,admin,wallet but then apply to be part of group "Voortrekkers Kommandos" (i.e. list of accounts), incurring membership cost and being listed as part of it.
+* add other items to pay, e.g. events, subscriptions, documents, products to be delivered
+* restrict account usage and buy more range
+* example of various school groups in an account
+* example of various interest groups vs paid members in an account
+* example of voortrekkers groups where admin of parent group determine cost and each sub group has different cost going into group wallet
+
 
 # TODO
 - After create account (+acc admin user), the temp password must only be good for change password before login (at moment it works for login too, but sysadmin could have seen that password, so not safe)

@@ -19,6 +19,12 @@ var log = logger.New().WithLevel(logger.LevelDebug)
 func main() {
 	api.New(
 		map[string]map[string]api.Handler{
+			"/register": {
+				"POST": register,
+			},
+			"/activate": {
+				"POST": activate,
+			},
 			"/login": {
 				"POST": login, //not authed else cannot login
 			},
@@ -67,6 +73,10 @@ func main() {
 				"PUT":    auth(updGroupMember),
 				"DELETE": auth(delGroupMember),
 			},
+
+			"/persons": {
+				"GET": auth(getPersons),
+			},
 		},
 	).Serve()
 }
@@ -108,6 +118,39 @@ func auth(f api.ContextHandler) api.Handler {
 		}
 	}
 } //auth()
+
+func register(httpRes http.ResponseWriter, httpReq *http.Request) {
+	var registerRequest db.RegisterRequest
+	if err := json.NewDecoder(httpReq.Body).Decode(&registerRequest); err != nil {
+		http.Error(httpRes, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	session, err := db.Register(registerRequest)
+	if err != nil {
+		http.Error(httpRes, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	httpRes.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(httpRes).Encode(*session)
+}
+
+//GET /activate?token=<token>
+func activate(httpRes http.ResponseWriter, httpReq *http.Request) {
+	var activateRequest db.ActivateRequest
+	if err := json.NewDecoder(httpReq.Body).Decode(&activateRequest); err != nil {
+		http.Error(httpRes, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	session, err := db.ActivateUser(activateRequest)
+	if err != nil {
+		http.Error(httpRes, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	httpRes.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(httpRes).Encode(*session)
+}
 
 func login(httpRes http.ResponseWriter, httpReq *http.Request) {
 	var loginRequest db.LoginRequest
@@ -352,7 +395,7 @@ func addGroup(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Re
 	}
 
 	groupSpec := db.Group{
-		Account: &session.User.Account,
+		Account: session.User.Account,
 		Name:    newGroup.Name,
 	}
 	if newGroup.AccountGroup {
@@ -540,4 +583,28 @@ func urlParamInt(httpReq *http.Request, paramName string, min, max, def int) int
 		}
 	}
 	return i
+}
+
+func getPersons(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
+	session := ctx.Value(db.Session{}).(db.Session)
+	if !session.User.Account.Admin {
+		return http.StatusUnauthorized, nil
+	}
+
+	//sysadmin only for now (other users can get access to users they know the ID of, e.g. family members or people who entered an event)
+	filter := db.PersonsFilter{}
+	if n := httpReq.URL.Query().Get("name"); n != "" {
+		filter.Name = &n
+	}
+	if n := httpReq.URL.Query().Get("surname"); n != "" {
+		filter.Surname = &n
+	}
+	persons, err := db.GetPersons(
+		filter,
+		[]string{"surname", "name"},
+		urlParamInt(httpReq, "limit", 1, 100, 10))
+	if err != nil {
+		return http.StatusInternalServerError, errors.Wrapf(err, "failed to get persons")
+	}
+	return http.StatusOK, persons
 }

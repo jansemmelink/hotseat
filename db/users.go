@@ -11,11 +11,12 @@ import (
 
 type User struct {
 	ID       string     `json:"id"`
-	Account  Account    `json:"account"`
+	Account  *Account   `json:"account,omitempty" doc:"Account is nil for non-account users registering on the system"`
 	Username string     `json:"username"`
 	Admin    bool       `json:"admin,omitempty"`
 	Active   bool       `json:"active"`
 	Expiry   *time.Time `json:"expiry,omitempty"`
+	Person   *Person    `json:"person,omitempty" doc:"Person linked to this user account"`
 }
 
 type userRow struct {
@@ -30,28 +31,34 @@ type userRow struct {
 	AccountActive bool     `db:"account_active"`
 	AccountAdmin  bool     `db:"account_admin"`
 	AccountExpiry *SqlTime `db:"account_expiry"`
+	PersonID      *string  `db:"person_id"`
 }
 
 func (ur userRow) User() User {
-	return User{
+	u := User{
 		ID:       ur.UserID,
+		Account:  nil,
 		Username: ur.Username,
-		Account: Account{
+		Admin:    ur.UserAdmin,
+		Active:   ur.UserActive,
+		Expiry:   (*time.Time)(ur.UserExpiry),
+		Person:   nil,
+	}
+	if ur.AccountID != "" {
+		u.Account = &Account{
 			ID:     ur.AccountID,
 			Name:   ur.AccountName,
 			Active: ur.AccountActive,
 			Admin:  ur.AccountAdmin,
 			Expiry: (*time.Time)(ur.AccountExpiry),
-		},
-		Admin:  ur.UserAdmin,
-		Active: ur.UserActive,
-		Expiry: (*time.Time)(ur.UserExpiry),
+		}
 	}
+	return u
 }
 
 const userRowQuery = "select u.id as user_id,u.username,u.passhash,u.active as user_active,u.admin as user_admin,u.expiry as user_expiry," +
 	"a.id as account_id,a.name as account_name,a.active as account_active,a.admin as account_admin," +
-	"a.expiry as account_expiry" +
+	"a.expiry as account_expiry,u.person_id" +
 	" from users as u" +
 	" LEFT JOIN accounts as a on a.id = u.account_id"
 
@@ -125,20 +132,31 @@ func GetUser(accountID string, userID string) (*User, error) {
 		return nil, errors.Wrapf(err, "failed to get user")
 	}
 	u := userRow.User()
+
+	if userRow.PersonID != nil {
+		person, err := GetPerson(*userRow.PersonID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get user.person")
+		}
+		u.Person = person
+	}
+
 	return &u, nil
 } //GetUser()
 
 type NewUser struct {
-	Account  Account    `json:"-"` //from session
+	Account  *Account   `json:"-"` //from session, nil for public user registration
 	Username string     `json:"username"`
 	Password string     `json:"password"`
 	Admin    bool       `json:"admin"`
 	Active   bool       `json:"active"`
 	Expiry   *time.Time `json:"expiry"`
+	Person   *Person    `json:"person"`
 }
 
 func AddUser(nu NewUser) (*User, error) {
-	if nu.Account.ID == "" {
+
+	if nu.Account == nil || nu.Account.ID == "" {
 		return nil, errors.Errorf("missing account_id")
 	}
 	if nu.Username == "" {
@@ -147,10 +165,6 @@ func AddUser(nu NewUser) (*User, error) {
 	if nu.Password == "" {
 		return nil, errors.Errorf("missing password")
 	}
-	stmt, err := getCompiledStatement("insert into users set id=:id,account_id=:account_id,username=:username,passhash=:passhash,admin=:admin,active=:active,expiry=:expiry")
-	if err != nil {
-		return nil, errors.Errorf("failed to prepare")
-	}
 	u := User{
 		ID:       uuid.New().String(),
 		Account:  nu.Account,
@@ -158,18 +172,24 @@ func AddUser(nu NewUser) (*User, error) {
 		Active:   nu.Active,
 		Admin:    nu.Admin,
 		Expiry:   nu.Expiry,
+		Person:   nu.Person,
 	}
-	passHash := passwordHash(u, nu.Password)
-	if _, err := stmt.Exec(
-		map[string]interface{}{
-			"id":         u.ID,
-			"account_id": u.Account.ID,
-			"username":   u.Username,
-			"passhash":   passHash,
-			"admin":      u.Admin,
-			"active":     u.Active,
-			"expiry":     u.Expiry,
-		},
+	personValues := map[string]interface{}{
+		"id":         u.ID,
+		"account_id": u.Account.ID,
+		"username":   u.Username,
+		"passhash":   passwordHash(u, nu.Password),
+		"admin":      u.Admin,
+		"active":     u.Active,
+		"expiry":     u.Expiry,
+		"person_id":  nil,
+	}
+	if u.Person != nil && u.Person.ID != "" {
+		personValues["person_id"] = u.Person.ID
+	}
+	if _, err := db.NamedExec(
+		"insert into users set id=:id,account_id=:account_id,username=:username,passhash=:passhash,admin=:admin,active=:active,expiry=:expiry,person_id=:person_id",
+		personValues,
 	); err != nil {
 		return nil, errors.Wrapf(err, "failed to insert user")
 	}
@@ -183,6 +203,153 @@ func passwordHash(u User, password string) string {
 	s += password
 	h.Write([]byte(s))
 	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+type RegisterRequest struct {
+	Email      string    `json:"email" doc:"Email is required to contact the user and to login."`
+	Phone      string    `json:"phone" doc:"Phone number where person may be contacted."`
+	Name       string    `json:"name" doc:"First name of the person registering as a user."`
+	Surname    string    `json:"surname" doc:"Surname of the person registering as a user."`
+	Dob        SqlDate   `json:"dob" doc:"Date of birth is required"`
+	Gender     SqlGender `json:"gender" doc:"Gender male|female is required"`
+	CountryID  string    `json:"country_id" doc:"Nationality of the person registering is indicated by a country_id"`
+	NationalID string    `json:"national_id" doc:"National ID number in the above country."`
+}
+
+type RegisterResponse struct {
+	Email string `json:"email" doc:"Use this to activate the account"`
+	Token string `json:"token" doc:"Use this to activate the account"`
+}
+
+var registerDobMin time.Time
+
+func init() {
+	registerDobMin, _ = time.ParseInLocation("2006-01-02", "1900-01-01", time.UTC)
+}
+
+func (req RegisterRequest) Validate() error {
+	if req.Name == "" {
+		return errors.Errorf("missing name")
+	}
+	if req.Surname == "" {
+		return errors.Errorf("missing surname")
+	}
+	if req.Gender != SqlGenderMale && req.Gender != SqlGenderFemale {
+		return errors.Errorf("gender not specified")
+	}
+	if req.Email == "" {
+		return errors.Errorf("missing email")
+	}
+	if req.Phone == "" {
+		return errors.Errorf("missing phone")
+	}
+	if time.Time(req.Dob).Before(registerDobMin) || time.Time(req.Dob).After(time.Now()) {
+		return errors.Errorf("dob:\"%s\" is outside range %s to current time (UTC).", time.Time(req.Dob).UTC().Format("2006-01-02"), registerDobMin)
+	}
+
+	if req.CountryID == "" {
+		return errors.Errorf("missing country_id")
+	}
+	if req.NationalID == "" {
+		return errors.Errorf("missing national_id")
+	}
+	return nil
+}
+
+//called to register new user from web site
+func Register(req RegisterRequest) (*RegisterResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, errors.Wrapf(err, "invalid request")
+	}
+	country, err := GetCountryByID(req.CountryID)
+	if err != nil {
+		log.Errorf("GetCountryByID failed: %+v", err)
+		country, err = GetCountryByName(req.CountryID)
+		if err != nil {
+			log.Errorf("GetCountryByName failed: %+v", err)
+			return nil, errors.Errorf("unknown country(%s)", req.CountryID)
+		}
+	}
+
+	person, err := AddPersonIfNotExist(Person{
+		Name:    req.Name,
+		Surname: req.Surname,
+		Email:   &req.Email,
+		Phone:   &req.Phone,
+		Dob:     &req.Dob,
+		Gender:  &req.Gender,
+		Nationalities: []Nationality{{
+			Country:    country,
+			NationalID: req.NationalID,
+		}},
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create personal info record")
+	}
+
+	newPassword := newRandomPassword(10)
+	user, err := AddUser(NewUser{
+		Account:  publicAccount,
+		Username: req.Email,
+		Password: newPassword,
+		Admin:    false,
+		Active:   false, //need to activate using current password and new password
+		Expiry:   nil,
+		Person:   person,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create user account")
+	}
+
+	return &RegisterResponse{
+		Email: req.Email,
+		Token: passwordHash(*user, newPassword),
+	}, nil
+}
+
+type ActivateRequest struct {
+	Email       string `json:"email" doc:"This is the email used to register"`
+	Token       string `json:"token" doc:"This is the token returned from register response"` //==random password given to inactive user account
+	NewPassword string `json:"new_password" doc:"New password selected by the user"`
+}
+
+func ActivateUser(req ActivateRequest) (*User, error) {
+	//todo: check strength of new password
+	log.Debugf("activate %+v", req)
+	if req.NewPassword == "" {
+		return nil, errors.Errorf("missing new_password")
+	}
+	if err := CheckPasswordStrength(req.NewPassword, 8); err != nil {
+		return nil, errors.Wrapf(err, "new_password not strong enough")
+	}
+
+	var userRow userRow
+	if err := NamedGet(&userRow, userRowQuery+" where u.username=:email and u.passhash=:token and u.active=false", map[string]interface{}{
+		"email": req.Email,
+		"token": req.Token,
+	}); err != nil {
+		return nil, errors.Wrapf(err, "user not found")
+	}
+	log.Debugf("activate userRow: %+v", userRow)
+
+	user := userRow.User()
+	log.Debugf("activate user: %+v", user)
+
+	//activate the user and set new password
+	if _, err := db.NamedExec("update users set active=true,passhash=:passhash where id=:id", map[string]interface{}{
+		"passhash": passwordHash(user, req.NewPassword),
+		"id":       user.ID,
+	}); err != nil {
+		return nil, errors.Wrapf(err, "failed to activate user account")
+	}
+	log.Debugf("user(%s) activated", user.ID)
+	user.Active = true
+	return &user, nil
+}
+
+//AddFamilyMember is called by a logged in parent to add a child or spouse or own parent
+func AddFamilyMember() error {
+	return errors.Errorf("NYI")
 }
 
 type LoginRequest struct {
@@ -210,7 +377,7 @@ func Login(req LoginRequest) (*Session, error) {
 		return nil, errors.Wrapf(err, "failed to prepare")
 	}
 	log.Debugf("Read: %+v", info)
-	passHash := passwordHash(User{ID: info.UserID, Account: Account{ID: info.AccountID}}, req.Password)
+	passHash := passwordHash(User{ID: info.UserID, Account: &Account{ID: info.AccountID}}, req.Password)
 	if info.PassHash != passHash {
 		log.Debugf("Login user(%s).password(%s): %s != %s", req.Username, req.Password, info.PassHash, passHash)
 		return nil, errors.Errorf("wrong password")
@@ -312,7 +479,7 @@ func GetSession(token string) (*Session, error) {
 		User: User{
 			ID:       info.UserID,
 			Username: info.Username,
-			Account: Account{
+			Account: &Account{
 				ID:     info.AccountID,
 				Name:   info.AccountName,
 				Active: info.AccountActive,
@@ -351,7 +518,7 @@ func ChangePassword(userID string, newPassword string) error {
 	}
 
 	passhash := passwordHash(
-		User{ID: userID, Account: Account{ID: row.AccountID}},
+		User{ID: userID, Account: &Account{ID: row.AccountID}},
 		newPassword,
 	)
 	if _, err := db.NamedExec(

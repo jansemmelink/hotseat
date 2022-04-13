@@ -62,6 +62,13 @@ func init() {
 		db = connResult.db
 		db.SetMaxOpenConns(c.MaxConnOpen)
 		db.SetMaxIdleConns(c.MaxConnIdle)
+
+		//load publicAccount info
+		var err error
+		publicAccount, err = GetAccountByName("public")
+		if err != nil {
+			panic("public account does not exist")
+		}
 		return
 
 	case <-time.After(time.Duration(c.MaxConnSeconds) * time.Second):

@@ -1,7 +1,6 @@
 package db
 
 import (
-	"math/rand"
 	"time"
 
 	"github.com/go-msvc/errors"
@@ -38,14 +37,21 @@ func GetAccounts(filter AccountsFilter, sort []string, limit int) ([]Account, er
 }
 
 type NewAccount struct {
-	Name string `json:"name"`
+	Name       string `json:"name"`
+	AdminEmail string `json:"admin_email"`
 }
 
-func AddAccount(newAccount NewAccount) (accountAdminUser *User, password string, err error) {
+func AddAccount(newAccount NewAccount) (accountAdminUser *User, activationToken string, err error) {
 	if newAccount.Name == "" {
 		return nil, "", errors.Errorf("missing name")
 	}
-	accountAdminUser = &User{Account: Account{}}
+	if newAccount.AdminEmail == "" {
+		return nil, "", errors.Errorf("missing admin_email")
+	}
+	if !ValidEmail(newAccount.AdminEmail) {
+		return nil, "", errors.Errorf("admin_email:\"%s\" is not a valid email address", newAccount.AdminEmail)
+	}
+	accountAdminUser = &User{Account: &Account{}}
 	accountAdminUser.Account.ID = uuid.New().String()
 	accountAdminUser.Account.Name = newAccount.Name
 	accountAdminUser.Account.Admin = false //not system admin account
@@ -62,33 +68,23 @@ func AddAccount(newAccount NewAccount) (accountAdminUser *User, password string,
 	}
 
 	accountAdminUser.ID = uuid.New().String()
-	accountAdminUser.Username = accountAdminUser.Account.Name + ".admin"
+	accountAdminUser.Username = newAccount.AdminEmail
 	accountAdminUser.Expiry = nil
-	accountAdminUser.Active = true
+	accountAdminUser.Active = false
 	accountAdminUser.Admin = true //account admin user
-	password = newRandomPassword(10)
-	passhash := passwordHash(*accountAdminUser, password)
+	activationToken = passwordHash(*accountAdminUser, newRandomPassword(10))
 	if _, err := db.NamedExec(
-		"INSERT INTO users SET id=:id,account_id=:account_id,username=:username,passhash=:passhash,admin=true,active=true,expiry=null",
+		"INSERT INTO users SET id=:id,account_id=:account_id,username=:username,passhash=:passhash,admin=true,active=false,expiry=null",
 		map[string]interface{}{
 			"id":         accountAdminUser.ID,
 			"account_id": accountAdminUser.Account.ID,
 			"username":   accountAdminUser.Username,
-			"passhash":   passhash,
+			"passhash":   activationToken,
 		},
 	); err != nil {
 		return nil, "", errors.Wrapf(err, "failed to create account admin user")
 	}
-	return accountAdminUser, password, nil
-}
-
-func newRandomPassword(n int) string {
-	s := ""
-	c := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$%^&*()_+-={}[]:\";'\\|<>,.?/"
-	for i := 0; i < n; i++ {
-		s += string(c[rand.Intn(len(c))])
-	}
-	return s
+	return accountAdminUser, activationToken, nil
 }
 
 func GetAccount(accountID string) (*Account, error) {
@@ -104,3 +100,19 @@ func GetAccount(accountID string) (*Account, error) {
 	}
 	return &account, nil
 }
+
+func GetAccountByName(name string) (*Account, error) {
+	var account Account
+	if err := NamedGet(
+		&account,
+		"SELECT * from accounts where name=:name",
+		map[string]interface{}{
+			"name": name,
+		},
+	); err != nil {
+		return nil, errors.Wrapf(err, "failed to get account")
+	}
+	return &account, nil
+}
+
+var publicAccount *Account
