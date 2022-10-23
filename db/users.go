@@ -78,7 +78,7 @@ func GetUsers(filter map[string]interface{}, sort []string, limit int) ([]User, 
 			filterQuery = append(filterQuery, "active=:active")
 			filterArgs["active"] = v
 		case "admin":
-			filterQuery = append(filterQuery, "admin=:admin")
+			filterQuery = append(filterQuery, "u.admin=:admin")
 			filterArgs["admin"] = v
 		default:
 			return nil, errors.Errorf("unknown filter field \"%s\"", n)

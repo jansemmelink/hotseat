@@ -58,120 +58,8 @@ Content-Type: text/plain; charset=utf-8
 ]
 ```
 
-## Accounts ##
-Login as sysadmin to create a new account with a name. It will automatically create the account admin users:
-
-```
-curl -s -D /dev/stderr  -XPOST 'http://localhost:3000/accounts' -HX-Auth-Token:c1f365dd-1d24-4d31-9ecd-076175eb873a -d'{"name":"test2"}'
-HTTP/1.1 200 OK
-Date: Tue, 05 Apr 2022 16:15:32 GMT
-Content-Length: 242
-Content-Type: text/plain; charset=utf-8
-
-{
-  "admin_user": {
-    "id": "ba3e192b-5875-43fd-a328-f2eedc20ab88",
-    "account": {
-      "id": "fab22945-4e92-48ac-aada-e4239729dd19",
-      "name": "test2",
-      "active": true,
-      "expiry": null
-    },
-    "username": "test2.admin",
-    "admin": true,
-    "active": true
-  },
-  "admin_password": "s^gL{;4nXc"
-}```
-
-Note the admin password down, as you will not see it again after this response. It is hashed in the db. You can change it manually in the db by trying to login with the password you want to use, then copy that hash from the hotseat log and update the user's passhash in the db and login again.
-
-Login as account admin using that username and password:
-
-```
-curl -s -D /dev/stderr -XPOST 'http://localhost:3000/login' -d'{"username":"test2.admin","password":"s^gL{;4nXc"}' | jq
-HTTP/1.1 200 OK
-Content-Type: application/json
-Date: Tue, 05 Apr 2022 16:18:27 GMT
-Content-Length: 253
-
-{
-  "token": "a8b67121-c8ea-4414-b163-d27929182243",
-  "user": {
-    "id": "ba3e192b-5875-43fd-a328-f2eedc20ab88",
-    "account": {
-      "id": "fab22945-4e92-48ac-aada-e4239729dd19",
-      "name": "test2",
-      "active": true,
-      "expiry": null
-    },
-    "username": "test2.admin",
-    "admin": true,
-    "active": true
-  }
-}
-```
-
-Use above token for subsequent API calls in this session.
-
-Each time you login, the previous user session is deleted. It is also deleted when you logout.
-Currently sessions never expire. TODO.
-
-## Groups ##
-
-Create a group for a user or an account with:
-
-```
-curl -s -D /dev/stdout -XPOST 'http://localhost:3000/groups' -HX-Auth-Token:a8b67121-c8ea-4414-b163-d27929182243 -d'{"name":"g1"}' | jq
-HTTP/1.1 200 OK
-Date: Tue, 05 Apr 2022 16:20:31 GMT
-Content-Length: 227
-Content-Type: text/plain; charset=utf-8
-
-{
-  "id": "339c364d-9d79-4118-b645-5b41b378da68",
-  "account": {
-    "id": "fab22945-4e92-48ac-aada-e4239729dd19",
-    "name": "test2",
-    "active": true,
-    "expiry": null
-  },
-  "owner_type": "user",
-  "owner_id": "ba3e192b-5875-43fd-a328-f2eedc20ab88",
-  "name": "g1"
-}
-```
-
-Get group details:
-
-```
-curl -s -D /dev/stderr -XGET 'http://localhost:3000/group/339c364d-9d79-4118-b645-5b41b378da68' -HX-Auth-Token:a8b67121-c8ea-4414-b163-d27929182243 | jq
-HTTP/1.1 200 OK
-Date: Tue, 05 Apr 2022 16:31:28 GMT
-Content-Length: 227
-Content-Type: text/plain; charset=utf-8
-
-{
-  "id": "339c364d-9d79-4118-b645-5b41b378da68",
-  "account": {
-    "id": "fab22945-4e92-48ac-aada-e4239729dd19",
-    "name": "test2",
-    "active": true,
-    "expiry": null
-  },
-  "owner_type": "user",
-  "owner_id": "ba3e192b-5875-43fd-a328-f2eedc20ab88",
-  "name": "g1"
-}
-```
-
-
-Add members to the group with:
-```
-% curl -s -D /dev/stdout -XPOST 'http://localhost:3000/group/339c364d-9d79-4118-b645-5b41b378da68/members' -HX-Auth-Token:a8b67121-c8ea-4414-b163-d27929182243 -d'{"member_type":"user","member_id":"...user id..."}'
-```
-
-
+## API ##
+See PostMan definition file
 
 # Default db contents:
 - system admin account
@@ -185,21 +73,67 @@ Add members to the group with:
 * added list of persons and retrieve list with GET /persons
 * POST /register for public users with profile
 * POST /activate for public users
+* POST /accounts also create user with email but no profile and requires user activation and login
+* POST /groups can create the parent group
+* Added meta on groups
+* Busy with fields on groups
 
 # NEXT
-* new account + admin -> active admin user, which should be inactive then activate with token as normal user does, and username should be an email, but no user profile for account admin user (e.g. admin@voortrekkers.co.za)
+* After group invite was sent:
+  - PUT from sub-group account id must update the group and set invitation=false and only then show in list of groups
+  - Also allow DELETE if not interested by that account admin
+  - Set fields
+  - Set meta for cost
+  - Get total cost
+  - See that public users cannot see groups that are only invitations
+  - Also not show groups that have sub-groups
+  - Allow when group becomes active for membership
+  - Membership could be module working from meta "members_xxx" only?
+  - Make list of groups that user can join? Search for "Midstream" for new users, or send invite to last year's members and show related groups in browser
+* Define fields on parent and child groups
+  * get list of all fields to join child group
+  * submit field values along with application to join the group
+  * notify admin of new applications
+  * review applications and accept/reject and notify the user
+  * also apply for non-users
+  * determine cost and take payment into each group wallet
+* allow other account (by id) to create sub group (need way to repeat this next year with new group, i.e. clone)
+* other account create sub group if allowed
+* make form for application to join the group
 
-* membership idea:
-  make groups (like accounts) that are flat, but group can belong to another group i.e. optional parent
-  then:
-    create new group (own admin, own wallet) then apply to become member, or
-    create child group that is a member (same admin, optional own wallet)
+* in account (Voortrekkers) create group "Lede 2022"
+      init group is inactive, i.e. persons cannot join
+      manage join requirements:
+          cost: <amount>
+          fields []   (e.g. person.name)
+              can also be things not specified in person or ... but then must be populated in join request
+          accept: always, manual (or later script i.e. HTTP POST ... with expected result)
+      indicate join on sub-group or this group
+        (Voortrekkers use sub group from a commando)
+        set "is_parent_group":{...}
+      for subs to be created, they need this ID and after create they will be accepted or rejected
+        append account IDs allowed to create such groups
+      on sub-create send notice to admin
+        accept: al
 
+* need inbox per user for notifications and to send messages between users
+  create invite friend link to send with external system (whatsApp/email/...)
 
-* register user with person profile (optional because system users has no person profile)
-    as part of public and specify password
-    then activate with URL (in email) made from register response
-    then let user join groups
+*     make group active to allow persons to join
+*   test user join group
+*
+* share group ID with other accounts (e.g. Midstream Voortrekkers) (using external comms) so they can create sub-group
+  (with same title) in their own account
+  adding cost and adding more fields/rules/...
+  when user join this group - they have to apply to both parent and child
+
+* test family joining a group
+* user wallet to pay from
+* account wallet to pay into when joining group
+*   compound group - pay both wallets
+
+* let person user create more persons for own family
+* let user join groups
     and make groups restrict membership e.g. with motivation and review, or with national id list check etc
     and allow existing public users to become group admins or account admins
 * add wallet to user
@@ -213,6 +147,13 @@ Add members to the group with:
 * example of various interest groups vs paid members in an account
 * example of voortrekkers groups where admin of parent group determine cost and each sub group has different cost going into group wallet
 
+BEFORE LAUNCH:
+- Unit Tests!
+- Restrict Use
+- Load Tests
+- Document
+
+
 
 # TODO
 - After create account (+acc admin user), the temp password must only be good for change password before login (at moment it works for login too, but sysadmin could have seen that password, so not safe)
@@ -220,3 +161,4 @@ Add members to the group with:
 - User upd/del to make admin/revoke admin rights, suspend or set expiry etc...
 - Delete account with all its contents (sysadmin only)
 - External auth/user management for an account for list of users and login check then creaste local session
+- Scripting and hooks

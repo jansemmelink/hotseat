@@ -1,0 +1,179 @@
+{
+    "types":{
+        "Voortrekker Kommando":{
+            "account_id":"<die voortrekkers se account_id>",
+            "description":"...",
+            "parent_type":"account",
+            "parent_id":"<die voortrekkers se account id - so kan net create binne die voortrekkers account>",
+            "membership":{
+                "validity":"manual|annual|montly|weekly|daily|custom",
+                "accept":"auto|manual|script|invite|...",
+                "cost":"200",
+                "renewal_cost":"e.g. if had membership X from last-year",
+                "includes":["other memberships costing <= this"]
+            },
+            "fields":[
+                {"title":"Gebied","option":["A","B","..."]},
+                {"title":"Kommando Leier","list":{"type":"Voortrekker Aanstelling"}},
+                {"title":"Spanne","list":{"type":"Span"}}
+            ]
+        },
+        "Voortrekker Aanstelling":{
+            "parent":null,
+            "fields":[
+                {"name":"vanaf_datum","type":"date"},
+                {"name":"persoon", "type":"select", "select_from":"person"}
+            ]
+        },
+        "Voortrekker Span":{
+            "parent":"kommando",
+            "fields":[
+                {"name":"naam", "type":"text"},
+                {"name":"offisier", "type":"Voortrekker Aanstelling"},
+                {"name":"begin_graad", "type":"int"},
+                {"name":"begin_jaar", "type":"year"},
+                {"name":"het_ontbind", "type":"date", "default":null}
+            ]
+        },
+        "Voortrekker Kamp":{
+
+        }
+    },
+    "groups":{
+        "...1":{
+            "account_id":"dievoortrekkers se account_id",
+            "name":"Die Voortrekkers",
+            "owner_type":"accounts",
+            "owner_id":"dievoortrekkers se account_id"
+        }
+
+        "Voortrekkers":{
+
+
+
+
+                "midstream":{
+                    "gestig":"2012-01-01",
+                    "gesluit":null,
+                    "spanne":{
+                        "bobbejaantjies":{
+                            "gr1_in":"2022",
+                            "offisier":[{"person":"Jan Semmelink", "from":"2022"}]
+                        },
+                        "rooibokke":{
+                            "gr1_in":"2021",
+                            "offisier":[{"person":"Ingrid Fourie", "from":"2021"}]
+                        }
+                    }
+                },
+                "rietvallei":{
+                    "gestig":"1980-01-01",
+                    "spanne":{
+
+                    }
+                }
+            }
+        }
+    }
+
+
+    "events":{
+        "lidmaatskap 2022":{},
+        "midstream kommando":{},
+        "seekamp":{},
+        "seejol":{},
+        "branderkapperjolle":{},
+        "npd":{
+            "type":"event",
+            "name":"Noordelike PD Kamp 2022",
+            "schedule":{
+                "Aankoms en tente opslaan vanaf":"2022-03-23 14:00 SAST",
+                "Amptelike Opening Seremonie":"2022-03-23 17:00 SAST",
+                "Afsluiting Seremonie":"2022-03-28 10:30 SAST",
+                "Vertrek vanaf":"2022-03-28 11:30 SAST"
+            },
+            "location":"Faeryglen Kampterrein; West Falia Fruits; Modjadjiskloof",
+            "contacts":{"Kampleier":"...","Administrasie":"","Navrae":""},
+            "cost":450,
+            "info":{"pdf":"..."},
+            "qualify":[".voortrekkers.registered_2022==true"],
+            "fields":[
+                {
+                    "name":"kursus_jeuglid",
+                    "title":"Kursus",
+                    "visible":["(.type==jeuglid)"],
+                    "option":[
+                        {
+                            "title":"Gr 1 - Tuinier",
+                            "value":"gr1_jeuglig",
+                            "qualify":["(.type==jeuglid)&&(.gr>=1)&&(.gr<=2)"]
+                        },
+                        {
+                            "title":"Gr 2 - Dierewaarneming",
+                            "value":"gr2_jeuglig",
+                            "qualify":["(.type==jeuglid)&&(.gr>=2)&&(.gr<=3)"]
+                        },
+                        {
+                            "title":"Gr 3 - Handwerk",
+                            "value":"gr3_jeuglig",
+                            "qualify":["(.type==jeuglid)&&(.gr>=3)&&(.gr<=4)"]
+                        },
+                        {
+                            "title":"Gr 4 - Plantekennis",
+                            "value":"gr4_jeuglig",
+                            "qualify":["(.type==jeuglid)&&(.gr>=4)&&(.gr<=5)"]
+                        },
+                        {
+                            "title":"Gr 5 - Touwerk",
+                            "value":"gr5_jeuglig",
+                            "qualify":["(.type==jeuglid)&&(.gr>=5)&&(.gr<=6)"]
+                        },
+                        {
+                            "title":"Gr 6 - Spoorsny",
+                            "value":"gr6_jeuglig",
+                            "qualify":["(.type==jeuglid)&&(.gr>=6)&&(.gr<=7)"]
+                        },
+                        {
+                            "title":"Gr 7 - Veldbewustheid",
+                            "value":"gr7_jeuglig",
+                            "qualify":["(.type==jeuglid)&&(.gr==7)"]
+                        }
+                    ]
+                },
+                {
+                    "name":"betrokkenheid1",
+                    "title":"Betrokkenheid (eerste keuse)",
+                    "visible":["(.type!=jeuglid)"],
+                    "option":[
+                        {"name":"Gr1 - Tuinier"},{"name":"Gr 2 - Dierewaarneming"},{"name":"Gr 3 - Handwerk"},{"name":"Gr 4 - Plantekennis"},{"name":"Gr 5 - Touwerk"},{"name":"Gr 6 - Spoorsny"},{"name":"Gr 7 - Veldbewustheid"},{"name":"kombuis"},{"name":"tegnies"}
+                    ]
+                },
+                {
+                    "name":"betrokkenheid2",
+                    "title":"Betrokkenheid (tweede keuse)",
+                    "visible":["(.type!=jeuglid)"],
+                    "option":[
+                        {"name":"Gr1 - Tuinier"},{"name":"Gr 2 - Dierewaarneming"},{"name":"Gr 3 - Handwerk"},{"name":"Gr 4 - Plantekennis"},{"name":"Gr 5 - Touwerk"},{"name":"Gr 6 - Spoorsny"},{"name":"Gr 7 - Veldbewustheid"},{"name":"kombuis"},{"name":"tegnies"}
+                    ]
+                },
+                {
+                    "name":"kamphemp",
+                    "title":"Kamphemp",
+                    "options":[
+                        {"title":"Ja (+R200)", "value":true, "cost":200},
+                        {"title":"Nee", "value":false}
+                    ]
+                },
+                {
+                    "name":"vervoer",
+                    "title":"Vervoer",
+                    "options":[
+                        {"title":"Eie vervoer","value":"eie","cost":0},
+                        {"title":"Bus vanaf Waterkloof Hoërskool (+R300)", "value":"bus_waterkloof", "cost":300},
+                        {"title":"Bus vanaf Waterkloof Hoërskool (+R200)", "value":"bus_kranskop", "cost":200}
+                    ]
+                }
+            ]
+        }
+    }
+}

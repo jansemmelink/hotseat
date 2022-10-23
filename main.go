@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"bitbucket.org/vservices/hotseat/db"
 	api "bitbucket.org/vservices/hotseat/go-api"
@@ -43,6 +44,15 @@ func main() {
 			"/user/{user_id}/password": {
 				"PUT": auth(updUserPassword),
 			},
+			"/messages": {
+				"POST": auth(sendMessage),
+				"GET":  auth(getMessages),
+			},
+			"/message/{message_id}": {
+				"GET": auth(getMessage),
+				"PUT": auth(updMessage),
+				"DEL": auth(delMessage),
+			},
 			"/accounts": {
 				"GET":  auth(getAccounts),
 				"POST": auth(addAccount),
@@ -56,24 +66,19 @@ func main() {
 				"DELETE": auth(delAccount),
 			},
 			"/groups": {
-				"GET":  auth(getGroups),
-				"POST": auth(addGroup),
+				"GET":  auth(getGroups, "Get list of groups owned by your account as well as groups that your account are allowed to create a sub-group in, even if you already did so."),
+				"POST": auth(addGroup, "Create a new group that belongs to the account. Only account admin can create a group."),
 			},
 			"/group/{group_id}": {
 				"GET":    auth(getGroup),
 				"PUT":    auth(updGroup),
 				"DELETE": auth(delGroup),
 			},
-			"/group/{group_id}/members": {
-				"GET":  auth(getGroupMembers),
-				"POST": auth(addGroupMember),
+			"/group/{group_id}/fields": {
+				"GET":    auth(getGroupFields),
+				"PUT":    auth(updGroupFields),
+				"DELETE": auth(delGroupFields),
 			},
-			"/group/{group_id}/member/{member_id}": {
-				"GET":    auth(getGroupMember),
-				"PUT":    auth(updGroupMember),
-				"DELETE": auth(delGroupMember),
-			},
-
 			"/persons": {
 				"GET": auth(getPersons),
 			},
@@ -81,7 +86,7 @@ func main() {
 	).Serve()
 }
 
-func auth(f api.ContextHandler) api.Handler {
+func auth(f api.ContextHandler, args ...interface{}) api.Handler {
 	return func(httpRes http.ResponseWriter, httpReq *http.Request) {
 		token := httpReq.Header.Get("X-Auth-Token")
 		session, err := db.GetSession(token)
@@ -264,11 +269,67 @@ func updUserPassword(ctx context.Context, httpRes http.ResponseWriter, httpReq *
 	return http.StatusOK, nil
 }
 
+func sendMessage(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
+	session := ctx.Value(db.Session{}).(db.Session)
+
+	toUserID := httpReq.URL.Query().Get("to_user_id")
+	if toUserID == "" {
+		return http.StatusBadRequest, errors.Errorf("missing URL parameter to_user_id")
+	}
+
+	toUser, err := db.GetUser("" /*session.User.Account.ID*/, toUserID)
+	if err != nil {
+		return http.StatusBadRequest, errors.Errorf("unknown to_user_id")
+	}
+
+	var body struct {
+		Message string `json:"message"`
+	}
+	if err := json.NewDecoder(httpReq.Body).Decode(&body); err != nil || body.Message == "" {
+		return http.StatusBadRequest, errors.Errorf("missing message in body")
+	}
+
+	id, err := session.User.SendMessage(
+		toUser,
+		body.Message,
+	)
+	if err != nil {
+		return http.StatusInternalServerError, errors.Wrapf(err, "failed to send")
+	}
+	return http.StatusOK, struct {
+		MessageID string `json:"message_id"`
+	}{
+		MessageID: id,
+	}
+}
+
+func getMessages(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
+	session := ctx.Value(db.Session{}).(db.Session)
+	messages, err := session.User.Inbox(httpReq.URL.Query().Get("status"), 30)
+	if err != nil {
+		return http.StatusInternalServerError, errors.Wrapf(err, "failed to read messages")
+	}
+	return http.StatusOK, messages
+}
+
+func getMessage(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
+	return http.StatusNotFound, errors.Errorf("NYI")
+}
+
+func updMessage(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
+	return http.StatusNotFound, errors.Errorf("NYI")
+}
+
+func delMessage(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
+	return http.StatusNotFound, errors.Errorf("NYI")
+}
+
 func getAccounts(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
 	session := ctx.Value(db.Session{}).(db.Session)
 	filter := db.AccountsFilter{}
 	if n := httpReq.URL.Query().Get("name"); n != "" {
 		filter.Name = &n
+		log.Debugf("filter.Name=%s", *filter.Name)
 	}
 	if !session.User.Account.Admin {
 		filter.ID = &session.User.Account.ID //if not sys admin: can only see own account
@@ -357,16 +418,9 @@ func getGroups(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.R
 		if aid := httpReq.URL.Query().Get("account_id"); aid != "" {
 			filter.AccountID = &aid
 		}
-		if ot := httpReq.URL.Query().Get("owner_type"); ot != "" {
-			filter.OwnerType = &ot
-		}
-		if oid := httpReq.URL.Query().Get("owner_id"); oid != "" {
-			filter.OwnerID = &oid
-		}
 	} else {
 		//not sysadmin: see only own account
 		filter.AccountID = &session.User.Account.ID
-		//todo: see groups owned by own account or own user
 	}
 
 	if n := httpReq.URL.Query().Get("name"); n != "" {
@@ -385,31 +439,17 @@ func getGroups(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.R
 
 func addGroup(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
 	session := ctx.Value(db.Session{}).(db.Session)
-	var newGroup struct {
-		Name         string `json:"name"`
-		AccountGroup bool   `json:"account_group"` //set this to true to make group owned by your account (only if you are account admin user!)
-		//todo: later also allow create of group with other types of owners... and delete when owner is deleted
+
+	//todo: check if account is allowed to create more groups (limit nr of groups)
+	if !session.User.Admin {
+		return http.StatusUnauthorized, errors.Errorf("only account admin user can create groups")
 	}
+
+	var newGroup db.NewGroup
 	if err := json.NewDecoder(httpReq.Body).Decode(&newGroup); err != nil {
 		return http.StatusBadRequest, errors.Wrapf(err, "failed to decode body")
 	}
-
-	groupSpec := db.Group{
-		Account: session.User.Account,
-		Name:    newGroup.Name,
-	}
-	if newGroup.AccountGroup {
-		if !session.User.Admin {
-			return http.StatusUnauthorized, errors.Errorf("account group can only be created by account admin users")
-		}
-		groupSpec.OwnerType = "account"
-		groupSpec.OwnerID = session.User.Account.ID
-	} else {
-		groupSpec.OwnerType = "user"
-		groupSpec.OwnerID = session.User.ID
-	}
-
-	g, err := db.AddGroup(groupSpec)
+	g, err := db.AddGroup(session.User, newGroup)
 	if err != nil {
 		return http.StatusInternalServerError, errors.Wrapf(err, "failed to add group")
 	}
@@ -418,9 +458,9 @@ func addGroup(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Re
 
 func getGroup(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
 	//session := ctx.Value(db.Session{}).(db.Session)
-	groupID := mux.Vars(httpReq)["group_id"]
+	groupID := strings.TrimSpace(mux.Vars(httpReq)["group_id"])
 	if groupID == "" {
-		return http.StatusBadRequest, errors.Errorf("missing /group/{group_id}")
+		return http.StatusBadRequest, errors.Errorf("expecting /group/<group_id> in URL")
 	}
 
 	log.Debugf("getGroup(%s)", groupID)
@@ -433,41 +473,154 @@ func getGroup(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Re
 } //getGroup()
 
 func updGroup(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
-	// session := ctx.Value(db.Session{}).(db.Session)
-	// groupID := mux.Vars(httpReq)["group_id"]
-	// if groupID == "" {
-	// 	return http.StatusBadRequest, errors.Errorf("missing /group/{group_id}")
-	// }
-	// var g model.Group
-	// if err := json.NewDecoder(httpReq.Body).Decode(&g); err != nil {
-	// 	return http.StatusBadRequest, errors.Wrapf(err, "cannot decode request")
-	// }
-	// if g.ID == "" {
-	// 	g.ID = groupID
-	// } else if g.ID != groupID {
-	// 	return http.StatusBadRequest, errors.Errorf("group id in URL and body mismatch")
-	// }
+	session := ctx.Value(db.Session{}).(db.Session)
+	groupID := strings.TrimSpace(mux.Vars(httpReq)["group_id"])
+	if groupID == "" {
+		return http.StatusBadRequest, errors.Errorf("expecting /group/<group_id> in URL")
+	}
+	if !session.User.Admin {
+		return http.StatusUnauthorized, errors.Errorf("only account admin user can change groups")
+	}
+	group, err := db.GetGroup(groupID)
+	if err != nil {
+		return http.StatusNotFound, nil
+	}
+	if group.Account.ID != session.User.Account.ID {
+		return http.StatusUnauthorized, errors.Errorf("group does not belong to your account")
+	}
 
-	// updatedGroup, err := db.UpdGroup(session.User, g)
-	// if err != nil {
-	// 	return http.StatusMethodNotAllowed, errors.Wrapf(err, "group not updated")
-	// }
-	// return http.StatusOK, updatedGroup
-	return http.StatusInternalServerError, errors.Errorf("NYI")
+	var changes db.Group
+	if err := json.NewDecoder(httpReq.Body).Decode(&changes); err != nil {
+		return http.StatusBadRequest, errors.Wrapf(err, "cannot decode request")
+	}
+
+	nrChanges := 0
+	if group.Name != changes.Name {
+		nrChanges++
+		group.Name = changes.Name
+	}
+	if changes.Description != nil &&
+		*changes.Description != "" &&
+		(group.Description == nil || *changes.Description != *group.Description) {
+		nrChanges++
+		group.Description = changes.Description
+	}
+
+	//set only group data that must change (nil not to change any thing, nil values to delete seleted meta names)
+	group.Data = changes.Data
+
+	//apply the changes
+	if err := db.UpdGroup(session.User, *group); err != nil {
+		return http.StatusMethodNotAllowed, errors.Wrapf(err, "failed to update group")
+	}
+
+	//read the updates
+	group, err = db.GetGroup(groupID)
+	if err != nil {
+		return http.StatusInternalServerError, errors.Wrapf(err, "failed to read updated group")
+	}
+	return http.StatusOK, group
 } //updGroup()
 
 func delGroup(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
-	// session := ctx.Value(db.Session{}).(db.Session)
-	// groupID := mux.Vars(httpReq)["group_id"]
-	// if groupID == "" {
-	// 	return http.StatusBadRequest, errors.Errorf("missing /group/{group_id}")
+	session := ctx.Value(db.Session{}).(db.Session)
+	groupID := strings.TrimSpace(mux.Vars(httpReq)["group_id"])
+	if groupID == "" {
+		return http.StatusBadRequest, errors.Errorf("expecting /group/<group_id> in URL")
+	}
+	if !session.User.Admin {
+		return http.StatusUnauthorized, errors.Errorf("only account admin user can delete a group")
+	}
+	if err := db.DelGroup(session.User, groupID); err != nil {
+		return http.StatusMethodNotAllowed, errors.Wrapf(err, "group not deleted")
+	}
+	return http.StatusNoContent, nil
+} //delGroup()
+
+func getGroupFields(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
+	//session := ctx.Value(db.Session{}).(db.Session)
+	groupID := strings.TrimSpace(mux.Vars(httpReq)["group_id"])
+	if groupID == "" {
+		return http.StatusBadRequest, errors.Errorf("expecting /group/<group_id> in URL")
+	}
+	includeParentFields := getBoolParam(httpReq.URL.Query().Get("include_parent_fields"), false)
+
+	log.Debugf("getGroupFields(%s)", groupID)
+	gf, err := db.GetGroupFields(groupID, includeParentFields)
+	if err != nil {
+		log.Errorf("getGroupFields(%s): %+v", groupID, err)
+		return http.StatusInternalServerError, errors.Wrapf(err, "failed to get group fields")
+	}
+	return http.StatusOK, gf
+} //getGroupFields()
+
+func updGroupFields(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
+	session := ctx.Value(db.Session{}).(db.Session)
+	groupID := strings.TrimSpace(mux.Vars(httpReq)["group_id"])
+	if groupID == "" {
+		return http.StatusBadRequest, errors.Errorf("expecting /group/<group_id> in URL")
+	}
+	if !session.User.Admin {
+		return http.StatusUnauthorized, errors.Errorf("only account admin user can change groups")
+	}
+	group, err := db.GetGroup(groupID)
+	if err != nil {
+		return http.StatusNotFound, nil
+	}
+	if group.Account.ID != session.User.Account.ID {
+		return http.StatusUnauthorized, errors.Errorf("group does not belong to your account")
+	}
+
+	var changes db.Group
+	if err := json.NewDecoder(httpReq.Body).Decode(&changes); err != nil {
+		return http.StatusBadRequest, errors.Wrapf(err, "cannot decode request")
+	}
+	return http.StatusInternalServerError, errors.Errorf("NYI")
+
+	// nrChanges := 0
+	// if group.Name != changes.Name {
+	// 	nrChanges++
+	// 	group.Name = changes.Name
 	// }
-	// if err := db.DelGroup(session.User, groupID); err != nil {
+	// if changes.Description != nil &&
+	// 	*changes.Description != "" &&
+	// 	(group.Description == nil || *changes.Description != *group.Description) {
+	// 	nrChanges++
+	// 	group.Description = changes.Description
+	// }
+
+	// //set only group data that must change (nil not to change any thing, nil values to delete seleted meta names)
+	// group.Data = changes.Data
+
+	// //apply the changes
+	// if err := db.UpdGroup(session.User, *group); err != nil {
+	// 	return http.StatusMethodNotAllowed, errors.Wrapf(err, "failed to update group")
+	// }
+
+	// //read the updates
+	// group, err = db.GetGroup(groupID)
+	// if err != nil {
+	// 	return http.StatusInternalServerError, errors.Wrapf(err, "failed to read updated group")
+	// }
+	// return http.StatusOK, group
+} //updGroupFields()
+
+func delGroupFields(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
+	session := ctx.Value(db.Session{}).(db.Session)
+	groupID := strings.TrimSpace(mux.Vars(httpReq)["group_id"])
+	if groupID == "" {
+		return http.StatusBadRequest, errors.Errorf("expecting /group/<group_id> in URL")
+	}
+	if !session.User.Admin {
+		return http.StatusUnauthorized, errors.Errorf("only account admin user can delete a group")
+	}
+	return http.StatusInternalServerError, errors.Errorf("NYI")
+
+	// if err := db.DelGroupFields(session.User, groupID); err != nil {
 	// 	return http.StatusMethodNotAllowed, errors.Wrapf(err, "group not deleted")
 	// }
 	// return http.StatusNoContent, nil
-	return http.StatusInternalServerError, errors.Errorf("NYI")
-} //delGroup()
+} //delGroupFields()
 
 func getGroupMembers(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.Request) (status int, res interface{}) {
 	session := ctx.Value(db.Session{}).(db.Session)
@@ -479,17 +632,8 @@ func getGroupMembers(ctx context.Context, httpRes http.ResponseWriter, httpReq *
 	}
 
 	//can only see your own group members
-	switch group.OwnerType {
-	case "user":
-		if group.OwnerID != session.User.ID {
-			return http.StatusUnauthorized, errors.Errorf("group(%s) belongs to another user - you cannot see the members", group.ID)
-		}
-	case "account":
-		if group.OwnerID != session.User.Account.ID {
-			return http.StatusUnauthorized, errors.Errorf("group(%s) belongs to another account - you cannot see the members", group.ID)
-		}
-	default:
-		return http.StatusUnauthorized, errors.Errorf("group(%s) belongs to a %s - you cannot see the members", group.ID, group.OwnerType)
+	if !session.User.Account.Admin && group.Account.ID != session.User.Account.ID {
+		return http.StatusUnauthorized, errors.Errorf("group(%s) belongs to another account - you cannot see the members", group.ID)
 	}
 	members, err := db.GetGroupMembers(
 		group.ID,
@@ -512,21 +656,9 @@ func addGroupMember(ctx context.Context, httpRes http.ResponseWriter, httpReq *h
 	}
 	log.Debugf("group: %+v", group)
 
-	//can only manage your own group members
-	switch group.OwnerType {
-	case "user":
-		if group.OwnerID != session.User.ID {
-			return http.StatusUnauthorized, errors.Errorf("group(%s) belongs to another user - you cannot manage the members", group.ID)
-		}
-	case "account":
-		if group.OwnerID != session.User.Account.ID {
-			return http.StatusUnauthorized, errors.Errorf("group(%s) belongs to another account - you cannot manage the members", group.ID)
-		}
-		if !session.User.Admin {
-			return http.StatusUnauthorized, errors.Errorf("group(%s) belongs to your account - only account admin can manage the members", group.ID)
-		}
-	default:
-		return http.StatusUnauthorized, errors.Errorf("group(%s) belongs to a \"%s\" - you cannot manage the members", group.ID, group.OwnerType)
+	//can only see your own group members
+	if !session.User.Account.Admin && group.Account.ID != session.User.Account.ID {
+		return http.StatusUnauthorized, errors.Errorf("group(%s) belongs to another account - you cannot see the members", group.ID)
 	}
 
 	//see what is being added
@@ -607,4 +739,16 @@ func getPersons(ctx context.Context, httpRes http.ResponseWriter, httpReq *http.
 		return http.StatusInternalServerError, errors.Wrapf(err, "failed to get persons")
 	}
 	return http.StatusOK, persons
+}
+
+func getBoolParam(v string, d bool) bool {
+	if v != "" {
+		if v == "true" {
+			return true
+		}
+		if v == "false" {
+			return false
+		}
+	}
+	return d
 }

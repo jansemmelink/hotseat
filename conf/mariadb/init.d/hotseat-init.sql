@@ -177,21 +177,52 @@ DROP TABLE IF EXISTS `groups`;
 CREATE TABLE `groups` (
   `id` VARCHAR(40) DEFAULT (uuid()) NOT NULL,
   `account_id` VARCHAR(40) NOT NULL,
+  `parent_group_id` VARCHAR(40) DEFAULT NULL,
   `name` VARCHAR(64) NOT NULL,
-  `owner_type` VARCHAR(40) NOT NULL,
-  `owner_id` VARCHAR(40) NOT NULL,
+  `description` TEXT DEFAULT NULL,
+  `invitation` BOOLEAN DEFAULT false,
+  FOREIGN KEY (`parent_group_id`) REFERENCES groups(`id`),
+  FOREIGN KEY (`account_id`) REFERENCES accounts(`id`),
   UNIQUE KEY `group_id` (`id`),
   UNIQUE KEY `group_name` (`account_id`,`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 
 CREATE TABLE `group_members` (
-  `id` VARCHAR(40) DEFAULT (uuid()) NOT NULL,
   `group_id` VARCHAR(40) NOT NULL,
-  `member_type` VARCHAR(40) NOT NULL,
-  `member_id` VARCHAR(40) NOT NULL,
-  UNIQUE KEY `group_member` (`group_id`,`member_id`),
-  FOREIGN KEY (`group_id`) REFERENCES groups(`id`)
+  `person_id` VARCHAR(40) NOT NULL,
+  `time_created` DATETIME NOT NULL,
+  `time_updated` DATETIME NOT NULL,
+  `accepted` BOOLEAN DEFAULT FALSE,
+  `rejected` TEXT DEFAULT NULL,
+  UNIQUE KEY `group_member` (`group_id`,`person_id`),
+  FOREIGN KEY (`group_id`) REFERENCES groups(`id`),
+  FOREIGN KEY (`person_id`) REFERENCES persons(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+
+--========================================
+
+DROP TABLE IF EXISTS `metas`;
+CREATE TABLE `metas` (
+  `table_name` VARCHAR(40) NOT NULL,
+  `table_id` VARCHAR(40) NOT NULL,
+  `name` VARCHAR(63) NOT NULL,
+  `value` TEXT DEFAULT NULL,
+  UNIQUE KEY `meta_key` (`table_name`,`table_id`,`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+
+--========================================
+
+DROP TABLE IF EXISTS `fields`;
+CREATE TABLE `fields` (
+  `table_name` VARCHAR(40) NOT NULL,
+  `table_id` VARCHAR(40) NOT NULL,
+  `order_nr` INT DEFAULT 0,
+  `name` VARCHAR(63) NOT NULL,
+  `type` VARCHAR(63) NOT NULL,
+  `description` TEXT DEFAULT NULL,
+  UNIQUE KEY `meta_key` (`table_name`,`table_id`,`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+
 
 --========================================
 
@@ -202,4 +233,19 @@ CREATE TABLE `events` (
   
 
 
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+
+
+DROP TABLE IF EXISTS `messages`;
+CREATE TABLE `messages` (
+  `id` VARCHAR(40) DEFAULT (uuid()),
+  `from_user_id` VARCHAR(40) NOT NULL,
+  `to_user_id` VARCHAR(40) NOT NULL,
+  `time_sent` DATETIME NOT NULL,
+  `time_read` DATETIME DEFAULT NULL,
+  `message` TEXT NOT NULL,
+  UNIQUE KEY `message_id` (`id`),
+  KEY `inbox_messages` (`to_user_id`,`time_sent`,`time_read`),
+  FOREIGN KEY (`from_user_id`) REFERENCES `users`(`id`),
+  FOREIGN KEY (`to_user_id`) REFERENCES `users`(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
